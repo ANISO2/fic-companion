@@ -1,0 +1,221 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Angular Material's prebuilt theme is loaded via angular.json "styles". */
+
+/* ============================================================
+   FIC — Festival International de Carthage
+   Palette « pierre & cuivre ».
+
+   Un backoffice se regarde huit heures par jour. La couleur va
+   dans les données, pas dans le châssis : neutres légèrement
+   chauds (la pierre de Carthage), un seul accent cuivre, aucun
+   dégradé. Le FIH saturait tout en bleu acier + turquoise.
+
+   Chroma faible = pas de fatigue oculaire.
+   Contraste : --primary sur blanc = 13.2:1, --ink sur --bg = 14.8:1.
+   L'accent cuivre ne porte jamais de texte : uniquement liserés,
+   anneaux de focus et états actifs.
+   ============================================================ */
+:root {
+  --primary: #262a2e;        /* graphite — boutons, liens */
+  --primary-700: #1a1d21;    /* barre latérale, aplat */
+  --accent: #b0663c;         /* cuivre — liseré actif, focus */
+  --ink: #1a1c1e;
+  --muted: #6a6c6e;
+  --bg: #f6f5f3;             /* pierre, très légèrement chaude */
+  --surface: #ffffff;
+  --line: #e5e3df;
+  --success: #12704a;
+  --warn: #a4551b;
+}
+
+html, body { height: 100%; }
+body {
+  margin: 0;
+  font-family: 'Inter', system-ui, sans-serif;
+  background: var(--bg);
+  color: var(--ink);
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Material Symbols icon helper */
+.msr {
+  font-family: 'Material Symbols Rounded';
+  font-weight: normal;
+  font-style: normal;
+  line-height: 1;
+  letter-spacing: normal;
+  text-transform: none;
+  white-space: nowrap;
+  -webkit-font-feature-settings: 'liga';
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Reusable card surface — angles plus nets, ombre teintée prune (FIC) */
+.surface-card {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  box-shadow: 0 1px 2px rgba(26, 28, 30, .06);
+  transition: box-shadow .2s ease, transform .2s ease;
+}
+.surface-card.is-hoverable:hover {
+  box-shadow: 0 6px 18px rgba(26, 28, 30, .10);
+  transform: translateY(-2px);
+}
+
+/* ------------------------------------------------------------
+   Élément de navigation actif (barre latérale).
+   FIH remplissait tout l'élément en blanc translucide ; FIC pose
+   un liseré cuivre à gauche sur un fond quasi transparent.
+   ------------------------------------------------------------ */
+.nav-active {
+  position: relative;
+  background: rgba(255, 255, 255, .07);
+  color: #fff;
+}
+.nav-active::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 7px;
+  bottom: 7px;
+  width: 3px;
+  border-radius: 0 3px 3px 0;
+  background: var(--accent);
+}
+
+/* Loading shimmer */
+.shimmer {
+  background: linear-gradient(90deg, #efeeeb 25%, #e3e1dc 37%, #efeeeb 63%);
+  background-size: 400% 100%;
+  animation: shimmer 1.4s ease infinite;
+  border-radius: 8px;
+}
+@keyframes shimmer { 0% { background-position: 100% 0; } 100% { background-position: -100% 0; } }
+
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+/* ============================================================
+   Reusable data tables
+   .table-scroll  : a region that scrolls horizontally AND vertically
+                    inside its card, so wide/long tables never clip the
+                    page or overflow off-screen.
+   sticky headers : column titles stay visible while you scroll the rows.
+                    For grouped (2-row) headers, mark the rows .grp and .sub
+                    so the second row pins just under the first.
+   .table-zebra   : subtle striping + hover for readability.
+   ============================================================ */
+.table-scroll {
+  overflow: auto;
+  max-height: 68vh;
+  -webkit-overflow-scrolling: touch;
+}
+.table-scroll > table { width: 100%; }
+
+.table-scroll thead tr.single th {
+  position: sticky; top: 0; z-index: 2;
+  background: var(--surface);
+  box-shadow: inset 0 -1px 0 var(--line);
+}
+.table-scroll thead tr.grp th {
+  position: sticky; top: 0; z-index: 3; height: 38px;
+  background: var(--surface);
+}
+.table-scroll thead tr.sub th {
+  position: sticky; top: 38px; z-index: 2; height: 30px;
+  background: var(--surface);
+  box-shadow: inset 0 -1px 0 var(--line);
+}
+
+.table-zebra tbody tr:nth-child(even) td { background: rgba(31, 95, 139, .025); }
+.table-zebra tbody tr:hover td { background: var(--bg); }
+
+/* ============================================================
+   Segmented toggle (e.g. Tableau / Diagramme)
+   A small pill group where exactly one option is active.
+   ============================================================ */
+.segmented {
+  display: inline-flex;
+  background: var(--bg);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 3px;
+  gap: 2px;
+}
+.segmented button {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 6px 14px;
+  border-radius: 8px;
+  font-size: .875rem; font-weight: 500;
+  color: var(--muted);
+  background: transparent;
+  border: none; cursor: pointer;
+  transition: background .15s ease, color .15s ease;
+}
+.segmented button:hover { color: var(--ink); }
+.segmented button.active {
+  background: var(--surface);
+  color: var(--primary);
+  box-shadow: 0 1px 3px rgba(16, 30, 54, .10);
+}
+
+/* ============================================================
+   3.5 — Finitions visuelles (purement additif).
+   Le systeme de design existant (cartes 16px, ombres douces,
+   conteneur centre max 1400px, etats chargement/vide/erreur,
+   grilles responsives) est CONSERVE. Ce bloc ne fait qu'ajouter
+   des finitions transverses ; aucune logique de donnees n'est
+   modifiee.
+   ============================================================ */
+
+/* Defilement doux + ancrage sous l'en-tete collant. */
+html { scroll-behavior: smooth; }
+:where(h1, h2, h3) { scroll-margin-top: 80px; }
+
+/* Selection de texte aux couleurs de la marque. */
+::selection { background: rgba(15, 157, 157, .18); color: var(--ink); }
+
+/* Scrollbars discretes et coherentes (WebKit + Firefox). */
+* { scrollbar-width: thin; scrollbar-color: var(--line) transparent; }
+*::-webkit-scrollbar { width: 10px; height: 10px; }
+*::-webkit-scrollbar-track { background: transparent; }
+*::-webkit-scrollbar-thumb {
+  background: var(--line); border-radius: 99px; border: 2px solid var(--surface);
+}
+*::-webkit-scrollbar-thumb:hover { background: #cdd4de; }
+
+/* En-tetes de tableaux lisibles : pas de retour a la ligne
+   disgracieux ; le defilement horizontal (.table-scroll) prend
+   le relais sur petits ecrans. */
+.table-scroll thead th { white-space: nowrap; }
+
+/* Indices d'ombre lateraux : signalent qu'un tableau large peut
+   defiler horizontalement (technique de fond "scroll shadow"). */
+.table-scroll {
+  background:
+    linear-gradient(to right, var(--surface) 30%, rgba(255,255,255,0)) left center / 28px 100% no-repeat,
+    linear-gradient(to left,  var(--surface) 30%, rgba(255,255,255,0)) right center / 28px 100% no-repeat,
+    linear-gradient(to right, rgba(16,30,54,.10), rgba(255,255,255,0)) left center / 9px 100% no-repeat,
+    linear-gradient(to left,  rgba(16,30,54,.10), rgba(255,255,255,0)) right center / 9px 100% no-repeat;
+  background-attachment: local, local, scroll, scroll;
+}
+
+/* Confort de lecture sur tres grands ecrans : les paragraphes
+   d'aide ne s'etirent pas a l'infini. */
+p.text-muted { max-width: 78ch; }
+
+/* Images/SVG jamais hors cadre. */
+img, svg { max-width: 100%; }
+
+/* Respecte la preference "moins d'animations". */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: .001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: .001ms !important;
+    scroll-behavior: auto !important;
+  }
+}

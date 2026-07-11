@@ -1,0 +1,231 @@
+server:
+  port: 8080
+
+spring:
+  # ---------------------------------------------------------------------------
+  # Database connection.
+  # All values are externalized as environment variables with LOCAL defaults,
+  # so on your laptop it "just works", and on the server you only set env vars.
+  # ---------------------------------------------------------------------------
+  datasource:
+    # Chantier 0 — base restauree depuis le dump FIC (pg_dump -Fc, PG 9.5.4).
+    # Le nom contient bien « billeteire » (faute d'origine, conservee telle quelle).
+    url: ${FIH_DB_URL:jdbc:postgresql://localhost:5432/billeteire-fic-2026}
+    # Connecting as the postgres superuser (no separate read-only role).
+    username: ${FIH_DB_USER:postgres}
+    password: ${FIH_DB_PASSWORD:admin}
+    driver-class-name: org.postgresql.Driver
+    hikari:
+
+      read-only: false
+      # ----------------------------------------------------------------------
+      pool-name: fih-pool
+      # server's max_connections, leaving room for the other apps. 10 is a sane
+      # start for one instance; raise only with metrics + DBA sign-off.
+      maximum-pool-size: ${FIH_DB_POOL_MAX:10}
+      minimum-idle: ${FIH_DB_POOL_MIN_IDLE:2}
+      # Fail FAST under a spike: a scanner gets a quick error and retries instead
+      # of dozens of requests hanging and piling up. 3 s, not the 30 s default.
+      connection-timeout: ${FIH_DB_CONN_TIMEOUT_MS:3000}
+      # Recycle connections before the server / load-balancer idle-kills them,
+      # which avoids "connection was closed" errors. Keep under the DB's limit.
+      max-lifetime: ${FIH_DB_MAX_LIFETIME_MS:600000}
+      idle-timeout: ${FIH_DB_IDLE_TIMEOUT_MS:120000}
+      # Cheap liveness probe so a dead connection is replaced, not handed out.
+      validation-timeout: ${FIH_DB_VALIDATION_TIMEOUT_MS:2000}
+
+  jpa:
+    hibernate:
+
+      ddl-auto: validate
+
+    open-in-view: false
+    show-sql: false
+    properties:
+      hibernate:
+        format_sql: true
+
+# ---------------------------------------------------------------------------
+# App-specific configuration.
+# ---------------------------------------------------------------------------
+fih:
+
+  # ===========================================================================
+  # External VOUCHER-INFO web service
+
+  # ===========================================================================
+  voucher-service:
+    base-url: ${FIH_VOUCHER_BASE_URL:}        # e.g. https://billetterie.example.tn/api/voucher-info
+    api-key:  ${FIH_VOUCHER_API_KEY:}         # optional; sent as X-Api-Key header
+    connect-timeout-ms: ${FIH_VOUCHER_CONNECT_TIMEOUT_MS:2000}
+    read-timeout-ms:    ${FIH_VOUCHER_READ_TIMEOUT_MS:3000}
+
+  stats:
+    cache-ttl-seconds: ${FIH_STATS_CACHE_TTL:30}
+
+  photos:
+    folder: ${FIH_PHOTOS_FOLDER:./photos}
+
+
+  # ===========================================================================
+  # Chantier 1 — types d'acces du FIC.
+  #
+  # P = Public, V = Vip, R = Press  (cf. AccessZoneResolver.LABELS, et le blob
+  # `modelebillet.access` qui est un java.util.ArrayList<String> serialise
+  # contenant exactement ces trois chaines).
+  #
+  # Les 35 IDs ci-dessous ont ete valides un a un contre `modelebillet` du dump :
+  # aucun ID manquant, aucun ID en trop.
+  #
+  # NOTE : 16 de ces listes de zones DIVERGENT de `modelebillet.access` en base
+  # (ex. id 2 « Badge Presse » : ici PVR, en base V seul). Cette map est
+  # purement DECLARATIVE (affichage des pastilles + PDF) ; elle ne pilote aucun
+  # controle d'acces. Elle est integree telle que fournie. Voir le rapport
+  # d'audit pour la table de divergence complete.
+  #
+  # « maxaccess 0 = illimite » (ids 1, 18, 38) et « [payant] » (ids 5, 7, 8) sont
+  # de simples COMMENTAIRES : le code lit deja `modelebillet.maxaccess` et
+  # `modelebillet.vente` directement en base. Aucun traitement supplementaire.
+  # ===========================================================================
+  access-zones:
+    "1":   [P, V, R]   # Badge Comite Directeur          (maxaccess 0 = illimite)
+    "2":   [P, V, R]   # Badge Presse
+    "3":   [P, V, R]   # Badge Staff
+    "4":   [P, V, R]   # Badge Controle
+    "5":   [P]         # Chaise Public                   [payant]
+    "6":   [P, V, R]   # Badge Technique
+    "7":   [P]         # Gradin Public                   [payant]
+    "8":   [P]         # Demi Tarif - Gradins            [payant]
+    "9":   [P, V]      # Invitation Chaise (1P)
+    "10":  [P, V]      # Invitation Chaise (2P)
+    "11":  [P]         # Invitation Gradin (1P)
+    "12":  [P]         # Invitation Gradin (2P)
+    "13":  [P, V]      # Kit VIP 2P Zone Apollon
+    "14":  [P, V, R]   # Badge Communication
+    "15":  [P, V, R]   # Badge Organisation
+    "16":  [P, V, R]   # Badge Sponsor
+    "17":  [P, V, R]   # Badge Entretien
+    "18":  [P, V, R]   # Pass                            (maxaccess 0 = illimite)
+    "19":  [P, V]      # VIP
+    "20":  [P, V, R]   # VIP Presse
+    "21":  [P, V]      # Badge Acceuil
+    "22":  [P, V]      # Kit VIP 2P Chaises
+    "26":  [P, V, R]   # Badge Artiste
+    "29":  [P, V]      # VIP SPONSOR
+    "30":  [P, V, R]   # Badge Inspection
+    "33":  [P, V]      # Kit VIP 2P Sponsor
+    "36":  [P, V, R]   # Badge Backstage
+    "37":  [P, V]      # Badge Buvette
+    "38":  [P, V, R]   # Badge Superviseur               (maxaccess 0 = illimite)
+    "39":  [P]         # Badge Chauffeur
+    "40":  [P, V]      # Invitation VIP 1P Zone Apollon
+    "41":  [P]         # Kit Gradins 2P Gratuit
+    "42":  [P, V]      # Invitation Chaise Artiste (1P)
+    "43":  [P, V, R]   # Badge Television Tunisienne
+    "198": [P, V, R]   # Badge Organisation logistique
+
+  security:
+    jwt:
+      secret: ${FIH_JWT_SECRET:k9Xz2pQ7mR4vL8nW3jT6yB1cF5hD0gS9aZ4eU7iO2xK8wN5qM3rV6tP1lJ0bH4dC7fG2yA9sE5uI8oR3}
+
+      expiration-minutes: ${FIH_JWT_EXPIRATION_MINUTES:480}
+    device-token: ${FIH_DEVICE_TOKEN:dev-device-token}
+
+
+    # Chantier 3 — CES COMPTES SONT DESORMAIS UN REPLI.
+    # Le systeme cible est la table `companion.app_user` (mots de passe BCrypt),
+    # alimentee depuis le backoffice (Administration -> Utilisateurs).
+    # AuthService essaie companion.app_user D'ABORD ; ces entrees ne servent que
+    # si le compte n'y existe pas encore. Elles ne sont PAS supprimees : rien ne
+    # casse en production si le script db/companion_schema.sql n'a pas ete joue.
+    #
+    # Un compte de repli n'a aucun type coche ni aucun lot : il ne voit RIEN.
+    #
+    # Feature 2 — comptes « Invitations & Badges » nommés. Chaque compte se
+    # connecte avec SON propre nom d'utilisateur : le sujet du JWT (donc
+    # badge_affectation.updated_by) reste individuellement attribuable.
+    # La clé singulière `invitations-account` reste supportée par le code
+    # (repli) mais n'est plus utilisée ici.
+    invitations-accounts:
+      - username: ${FIH_INVITATIONS_1_USERNAME:AdminInv1}
+        password: ${FIH_INVITATIONS_1_PASSWORD:Inv$admin+2026}
+        display-name: "${FIH_INVITATIONS_1_DISPLAY_NAME:Invitations & Badges 1}"
+      - username: ${FIH_INVITATIONS_2_USERNAME:AdminInv2}
+        password: ${FIH_INVITATIONS_2_PASSWORD:KLOP$ain+2026}
+        display-name: "${FIH_INVITATIONS_2_DISPLAY_NAME:Invitations & Badges 2}"
+
+
+  badge:
+    photo-dir: ${FIH_PHOTO_DIR:D:/Bitaka/bitaka/fih-companion/photos}
+    photo-key: codebarre            # filename field; falls back to numeroserie
+    photo-extensions: [jpg, jpeg, png]
+    width-mm: 100
+    height-mm: 150
+    zip-threshold: 150              # batches larger than this download as a ZIP
+
+
+    # =========================================================================
+    # Chantier 2 — LA source de verite du classement des modeles.
+    #
+    # Trois sections dans le backoffice, dans cet ordre :
+    #   INVITATION -> section « Invitations » (en haut). Ce sont AUSSI les seuls
+    #                 modeles imprimables : `invitation-models` en est DERIVE.
+    #   BADGE      -> section « Badges »
+    #   ACCES      -> section « Portes / Acces » (« le reste »)
+    #
+    # Tout modele absent de cette map tombe dans ACCES. Il n'existe PAS de
+    # second mecanisme : ModelClassificationService.category() lit uniquement ici.
+    #
+    # ATTENTION — les modeles 5, 7 et 8 (vente=true) sont exclus en amont de
+    # toute la section Invitations & Badges par isAffectable(). Ils sont listes
+    # dans ACCES pour la coherence, mais ils n'apparaitront PAS a l'ecran tant
+    # que ce filtre existe. Voir la question ouverte du rapport d'audit.
+    # =========================================================================
+    #
+    # CORRECTION — les 4 KITS (13, 22, 33, 41) ne sont PAS des invitations.
+    # Leur libelle ne contient pas « Invitation ». Ils passent en BADGE, et
+    # sortent donc de invitationModelSet() : plus aucun bouton d'impression,
+    # aucun PDF, aucune entree dans le ZIP batch.
+    #
+    # Restent INVITATION, et eux seuls : 9, 10, 11, 12, 40, 42.
+    #
+    model-categories:
+      INVITATION: [9, 10, 11, 12, 40, 42]
+      BADGE:      [1, 2, 3, 4, 6, 13, 14, 15, 16, 17, 21, 22, 26, 30, 33, 36, 37, 38, 39, 41, 43, 198]
+      ACCES:      [5, 7, 8, 18, 19, 20, 29]
+
+    # Repli historique. IGNORE tant que model-categories.INVITATION est renseigne.
+    # Conserve pour ne rien casser si la map est videe. Aligne sur la map.
+    invitation-models: ${FIH_INVITATION_MODELS:9,10,11,12,40,42}
+
+    # =====================  e-ticket layout =====================
+    # Invitation A4 portrait (210 x 297 mm).
+    ticket-width-mm: 210
+    ticket-height-mm: 297
+
+    # Lieu statique imprimé sur l'invitation.
+    venue-name: "${FIH_VENUE_NAME:Théâtre Antique de Carthage}"
+
+
+    poster-dir: ${FIH_POSTER_DIR:D:\Bitaka\bitaka\fic-companion\fic-companion\posters}
+    poster-default: poster-default.jpg
+    poster-extensions: [jpg, jpeg, png]
+
+    # ---- per-badge PDF size control -----------------------------------------
+    # The poster JPEG is the largest thing inside each ticket PDF. The panel is
+    # only ~100 mm wide, so embedding a full-res poster is wasted bytes. These
+    # cap what gets embedded (poster is downscaled + re-encoded once per batch):
+    #   600 px over 100 mm ≈ 150 dpi, q0.72 ≈ 53 KB/badge  (default, safe).
+    # For the smallest possible ZIP, lower them, e.g. 450 / 0.65 ≈ 25 KB/badge.
+    poster-embed-max-px: ${FIH_POSTER_EMBED_MAX_PX:500}
+    poster-embed-quality: ${FIH_POSTER_EMBED_QUALITY:0.62}
+
+
+    show-time: ${FIH_SHOW_TIME:22:00}
+    # ================================================================
+    # Optional per-event overrides, keyed by event date (yyyy-MM-dd = ddate).
+
+
+logging:
+  level:
+    org.hibernate.SQL: info

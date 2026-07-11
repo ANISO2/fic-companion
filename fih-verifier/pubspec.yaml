@@ -1,0 +1,48 @@
+name: fih_verifier
+description: "FIH Verifier — gate/turnstile companion app for the Festival International de Hammamet."
+publish_to: 'none'
+
+version: 1.0.0+1
+
+environment:
+  sdk: ^3.9.2
+
+dependencies:
+  flutter:
+    sdk: flutter
+
+  # French Material/Cupertino localizations (date pickers, default widget text).
+  flutter_localizations:
+    sdk: flutter
+
+  cupertino_icons: ^1.0.8
+
+  # Barcode/QR scanner: MLKit (Android) + AVFoundation (iOS), on-device, torch,
+  # QR + 1D formats. Actively maintained (qr_code_scanner/flutter_barcode_scanner
+  # are not). API used is isolated to scanner_page.dart.
+  mobile_scanner: ^7.0.0
+
+  # HTTP client with interceptors (device-token header) and per-request timeouts.
+  dio: ^5.7.0
+
+  # Locale-aware dates + TND money. Version aligned with flutter_localizations.
+  intl: ^0.20.2
+
+  # Audible scan feedback (accept/refuse tones). Replaces SystemSound, which is
+  # silent on Android unless system touch-sounds are on. Used only in
+  # core/feedback/feedback_service.dart.
+  audioplayers: ^6.1.0
+
+  # Persist the runtime-editable backend API base URL (Réglages → API). Used
+  # only in core/config/app_config.dart.
+  shared_preferences: ^2.3.2
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^5.0.0
+
+flutter:
+  uses-material-design: true
+  assets:
+    - assets/sounds/
