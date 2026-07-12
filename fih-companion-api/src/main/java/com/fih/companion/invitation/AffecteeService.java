@@ -111,8 +111,10 @@ public class AffecteeService {
                     "Cette invitation est déjà affectée et ne peut plus être modifiée.");
         }
 
-        // sequence from the highest number already used for this base.
-        int next = nextNumberForBase(base);
+        // Numérotation SCOPÉE au couple (événement, type d'invitation) du billet :
+        // « Anis » repart à -01 dès qu'on change d'événement OU de type, au lieu
+        // de suivre un compteur global. L'affectation par lot reste inchangée.
+        int next = nextNumberForBaseScoped(base, billet.getEvenement(), billet.getModelebillet());
         String unique = formatName(base, next, widthFor(next));
 
         BadgeAffectation entity = new BadgeAffectation(numeroserie, unique, updatedBy);
@@ -274,6 +276,29 @@ public class AffecteeService {
         Pattern shape = Pattern.compile("^" + Pattern.quote(base) + "-(\\d+)$", Pattern.CASE_INSENSITIVE);
         int max = 0;
         for (String stored : affectationRepository.findNamesForBase(base)) {
+            if (stored == null) continue;
+            Matcher m = shape.matcher(stored.trim());
+            if (m.matches()) {
+                try {
+                    max = Math.max(max, Integer.parseInt(m.group(1)));
+                } catch (NumberFormatException ignore) {
+                }
+            }
+        }
+        return max + 1;
+    }
+
+    /**
+     * Prochain numéro pour {@code base}, mais UNIQUEMENT parmi les affectations du
+     * même couple (événement, type d'invitation). Deux couples différents ont donc
+     * chacun leur propre séquence : « Anis » recommence à 01 à chaque nouveau
+     * couple. Réservé à l'affectation « Affecté à » unitaire ; l'affectation par
+     * lot passe toujours par {@link #nextNumberForBase(String)} (global, inchangé).
+     */
+    private int nextNumberForBaseScoped(String base, Integer eventId, Integer modelId) {
+        Pattern shape = Pattern.compile("^" + Pattern.quote(base) + "-(\\d+)$", Pattern.CASE_INSENSITIVE);
+        int max = 0;
+        for (String stored : affectationRepository.findNamesForBaseScoped(base, eventId, modelId)) {
             if (stored == null) continue;
             Matcher m = shape.matcher(stored.trim());
             if (m.matches()) {

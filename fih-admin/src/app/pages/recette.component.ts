@@ -10,7 +10,7 @@ import { ChartCardComponent } from '../shared/chart-card.component';
 import { SERIES_COLORS } from '../shared/echarts-theme';
 import { NumPipe, TndPipe, PctPipe, FDatePipe } from '../shared/format';
 
-type SummaryKey = 'eventTitle' | 'billet' | 'voucher' | 'total';
+type SummaryKey = 'eventDate' | 'eventTitle' | 'billet' | 'voucher' | 'total';
 type ViewMode = 'chart' | 'table';
 
 /** Format a number as TND with fr grouping — used inside ECharts tooltips/labels. */
@@ -104,7 +104,7 @@ function tnd(v: number): string {
             <table class="text-sm">
               <thead>
                 <tr class="single text-left text-muted">
-                  <th class="px-4 py-3 cursor-pointer select-none" (click)="sortSummary('eventTitle')">Événement {{ caretS('eventTitle') }}</th>
+                  <th class="px-4 py-3 cursor-pointer select-none" (click)="sortSummary('eventDate')">Événement {{ caretS('eventDate') }}</th>
                   <th class="px-4 py-3 text-right cursor-pointer select-none" (click)="sortSummary('billet')">Billet {{ caretS('billet') }}</th>
                   <th class="px-4 py-3 text-right cursor-pointer select-none" (click)="sortSummary('voucher')">Voucher {{ caretS('voucher') }}</th>
                   <th class="px-4 py-3 text-right cursor-pointer select-none" (click)="sortSummary('total')">Total {{ caretS('total') }}</th>
@@ -289,8 +289,10 @@ export class RecetteComponent implements OnInit {
   view = signal<ViewMode>('chart');
   query = signal('');
 
-  sortKey = signal<SummaryKey>('total');
-  sortAsc = signal(false);
+  // Tri par défaut : chronologique (date d'événement, du plus ancien au plus
+  // récent), cohérent avec la détaillée et la recette par guichet.
+  sortKey = signal<SummaryKey>('eventDate');
+  sortAsc = signal(true);
 
   // Total général (résumé) — calculé côté client, toujours cohérent au tri.
   grand = computed(() => {
@@ -313,19 +315,34 @@ export class RecetteComponent implements OnInit {
     const key = this.sortKey();
     const dir = this.sortAsc() ? 1 : -1;
     return [...this.summary()].sort((a, b) => {
+      if (key === 'eventDate') {
+        // Dates ISO ("2025-07-29") : comparaison lexicale = ordre chronologique.
+        const cmp = (a.eventDate || '').localeCompare(b.eventDate || '');
+        return (cmp !== 0 ? cmp : a.eventTitle.localeCompare(b.eventTitle, 'fr')) * dir;
+      }
       const av = a[key]; const bv = b[key];
       if (typeof av === 'string' && typeof bv === 'string') return av.localeCompare(bv, 'fr') * dir;
       return ((av as number) - (bv as number)) * dir;
     });
   });
 
+  // Panneaux détaillée triés chronologiquement (du plus proche au plus lointain),
+  // côté client, pour ne dépendre d'aucun ordre du serveur. Dates ISO
+  // ("2025-07-29") => comparaison lexicale = ordre chronologique.
+  private headersByDate = computed(() =>
+    [...this.headers()].sort((a, b) => {
+      const cmp = (a.eventDate || '').localeCompare(b.eventDate || '');
+      return cmp !== 0 ? cmp : a.eventTitle.localeCompare(b.eventTitle, 'fr');
+    }));
+
   // Recherche : filtre les panneaux par titre d'événement OU par nom de modèle
   // déjà chargé (un panneau ouvert dont un modèle correspond reste visible).
   filteredHeaders = computed(() => {
     const q = this.norm(this.query());
-    if (!q) return this.headers();
+    const ordered = this.headersByDate();
+    if (!q) return ordered;
     const rows = this.rowsByEvent();
-    return this.headers().filter(h =>
+    return ordered.filter(h =>
       this.norm(h.eventTitle).includes(q) ||
       (rows.get(h.eventId) ?? []).some(r => this.norm(r.modelName).includes(q)));
   });
@@ -371,12 +388,16 @@ export class RecetteComponent implements OnInit {
   });
 
   /**
-   * Barres HORIZONTALES, une par événement, triées par quantité générée. Chaque
+   * Barres HORIZONTALES, une par événement, en ordre chronologique (du plus
+   * ancien en haut au plus récent en bas), cohérent avec les tableaux. Chaque
    * barre empile Vendu + Reste : sa longueur totale = quantité générée. Bien plus
    * lisible que 34 groupes de 3 barres verticales aux libellés tronqués.
    */
   gvrOpt = computed<EChartsOption>(() => {
-    const rows = [...this.headers()].sort((a, b) => a.totalGenere - b.totalGenere); // asc -> plus gros en haut
+    // Ordre chronologique, cohérent avec les tableaux. L'axe catégoriel d'ECharts
+    // place l'index 0 en bas : on trie donc par date décroissante pour que
+    // l'événement le plus ANCIEN apparaisse en HAUT.
+    const rows = [...this.headers()].sort((a, b) => (b.eventDate || '').localeCompare(a.eventDate || ''));
     const fr = (v: number) => (v || 0).toLocaleString('fr-FR');
     return {
       grid: { left: 12, right: 24, top: 10, bottom: 36, containLabel: true },
@@ -552,7 +573,7 @@ export class RecetteComponent implements OnInit {
 
   sortSummary(key: SummaryKey): void {
     if (this.sortKey() === key) this.sortAsc.update(v => !v);
-    else { this.sortKey.set(key); this.sortAsc.set(key === 'eventTitle'); }
+    else { this.sortKey.set(key); this.sortAsc.set(key === 'eventDate' || key === 'eventTitle'); }
   }
   caretS(key: SummaryKey): string { return this.sortKey() === key ? (this.sortAsc() ? '▲' : '▼') : ''; }
 }
