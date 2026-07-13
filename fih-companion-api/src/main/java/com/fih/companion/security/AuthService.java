@@ -70,6 +70,11 @@ public class AuthService {
             return invitationsLogin;
         }
 
+        LoginResponse gestionLogin = tryGestionAccount(request);
+        if (gestionLogin != null) {
+            return gestionLogin;
+        }
+
         Utilisateur user = utilisateurRepository.findByUsername(request.username())
                 .orElseThrow(AuthService::unauthorized);
 
@@ -141,6 +146,38 @@ public class AuthService {
                     ? acc.getUsername() : acc.getDisplayName();
             String token = jwtService.generate(acc.getUsername(), Roles.INVITATIONS_CLAIM, displayName);
             return new LoginResponse(token, Roles.INVITATIONS_CLAIM, displayName);
+        }
+        return null;
+    }
+
+    /**
+     * Comptes « Gestion » (fih.security.gestion-accounts) : accès Invitations,
+     * Badges, Utilisateurs et Lots d'invitations — jamais recette/stats. Même
+     * logique que {@link #tryInvitationsAccount(LoginRequest)} : le sujet du JWT
+     * est le nom d'utilisateur du compte, donc l'audit reste attribuable.
+     */
+    private LoginResponse tryGestionAccount(LoginRequest request) {
+        if (request == null) return null;
+        List<SecurityProperties.InvitationsAccount> accounts =
+                securityProperties.resolvedGestionAccounts();
+        if (accounts.isEmpty()) return null;
+
+        String submittedUser = request.username() == null ? "" : request.username().trim();
+        if (submittedUser.isEmpty()) return null;
+
+        for (SecurityProperties.InvitationsAccount acc : accounts) {
+            if (!submittedUser.equalsIgnoreCase(acc.getUsername().trim())) {
+                continue;
+            }
+            if (!passwordMatches(request.password(), acc.getPassword())) {
+                throw unauthorized();
+            }
+            String displayName = acc.getDisplayName() == null || acc.getDisplayName().isBlank()
+                    ? acc.getUsername() : acc.getDisplayName();
+            ConsoleLog.log(TAG, "DECISION=AUTHENTICATED — compte gestion " + acc.getUsername()
+                    + " (application.yml, rôle GESTION).");
+            String token = jwtService.generate(acc.getUsername(), Roles.GESTION_CLAIM, displayName);
+            return new LoginResponse(token, Roles.GESTION_CLAIM, displayName);
         }
         return null;
     }

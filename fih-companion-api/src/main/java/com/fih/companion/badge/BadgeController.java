@@ -60,7 +60,7 @@ public class BadgeController {
                                        Authentication auth) {
         // Feature 2 — the route stays open to ADMIN + INVITATIONS (both need the
         // grid); only the audit fields are role-scoped, at the DTO mapping point.
-        return query.items(eventId, modelId, page, size, search, status, delivery, Roles.isAdmin(auth), auth);
+        return query.items(eventId, modelId, page, size, search, status, delivery, Roles.hasFullDataAccess(auth), auth);
     }
 
     @GetMapping("/counts")

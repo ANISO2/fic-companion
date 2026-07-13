@@ -16,7 +16,16 @@ export class AuthService {
   readonly isLoggedIn = computed(() => !!this._token());
   /** Feature 1 — restricted account limited to the Invitations & Badges section. */
   readonly isInvitationsOnly = computed(() => this.role() === 'INVITATIONS');
-readonly isAdmin = computed(() => !!this.role() && this.role() !== 'INVITATIONS');
+  /** Compte « Gestion » : Invitations, Badges, Utilisateurs et Lots — sans recette/stats. */
+  readonly isGestion = computed(() => this.role() === 'GESTION');
+  readonly isAdmin = computed(() => !!this.role() && this.role() !== 'INVITATIONS' && this.role() !== 'GESTION');
+  /**
+   * Accès complet aux données des sections Invitations / Badges / Lots /
+   * Utilisateurs : ADMIN ou GESTION (jamais INVITATIONS). Un compte GESTION y
+   * dispose des mêmes contrôles qu'un admin (filtre de livraison, colonnes
+   * « Confié à » et « Affecté par »). Miroir de Roles.hasFullDataAccess côté API.
+   */
+  readonly hasFullDataAccess = computed(() => this.isAdmin() || this.isGestion());
   constructor(private http: HttpClient) {}
 
   token(): string | null { return this._token(); }

@@ -131,21 +131,6 @@ fih:
       expiration-minutes: ${FIH_JWT_EXPIRATION_MINUTES:480}
     device-token: ${FIH_DEVICE_TOKEN:dev-device-token}
 
-
-    # Chantier 3 — CES COMPTES SONT DESORMAIS UN REPLI.
-    # Le systeme cible est la table `companion.app_user` (mots de passe BCrypt),
-    # alimentee depuis le backoffice (Administration -> Utilisateurs).
-    # AuthService essaie companion.app_user D'ABORD ; ces entrees ne servent que
-    # si le compte n'y existe pas encore. Elles ne sont PAS supprimees : rien ne
-    # casse en production si le script db/companion_schema.sql n'a pas ete joue.
-    #
-    # Un compte de repli n'a aucun type coche ni aucun lot : il ne voit RIEN.
-    #
-    # Feature 2 — comptes « Invitations & Badges » nommés. Chaque compte se
-    # connecte avec SON propre nom d'utilisateur : le sujet du JWT (donc
-    # badge_affectation.updated_by) reste individuellement attribuable.
-    # La clé singulière `invitations-account` reste supportée par le code
-    # (repli) mais n'est plus utilisée ici.
     invitations-accounts:
       - username: ${FIH_INVITATIONS_1_USERNAME:AdminInv1}
         password: ${FIH_INVITATIONS_1_PASSWORD:Inv$admin+2026}
@@ -153,6 +138,11 @@ fih:
       - username: ${FIH_INVITATIONS_2_USERNAME:AdminInv2}
         password: ${FIH_INVITATIONS_2_PASSWORD:KLOP$ain+2026}
         display-name: "${FIH_INVITATIONS_2_DISPLAY_NAME:Invitations & Badges 2}"
+
+    gestion-accounts:
+      - username: ${FIH_GESTION_1_USERNAME:AdminGestion}
+        password: ${FIH_GESTION_1_PASSWORD:Ges@fic+2026}
+        display-name: "${FIH_GESTION_1_DISPLAY_NAME:Gestion Invitations}"
 
 
   badge:

@@ -67,7 +67,7 @@ interface NavItem { label: string; icon: string; path: string; }
                     aria-label="Ouvrir le menu">
               <span class="msr">menu</span>
             </button>
-            <h1 class="text-lg font-semibold text-ink">{{ auth.isInvitationsOnly() ? 'FIC · Invitations & Badges' : 'FIC · Statistiques' }}</h1>
+            <h1 class="text-lg font-semibold text-ink">{{ auth.isInvitationsOnly() ? 'FIC · Invitations & Badges' : auth.isGestion() ? 'FIC · Gestion' : 'FIC · Statistiques' }}</h1>
 
             <div class="flex-1"></div>
           </div>
@@ -123,6 +123,11 @@ export class ShellComponent {
     if (this.auth.isInvitationsOnly()) {
       // Chantier 2 (révisé) — un compte restreint garde les deux pages.
       return this.nav.filter(item => item.path === 'invitations' || item.path === 'badges' || item.path === 'acces');
+    }
+    // Compte « Gestion » : Invitations, Badges, Utilisateurs, Lots d'invitations.
+    if (this.auth.isGestion()) {
+      return this.nav.filter(item => item.path === 'invitations' || item.path === 'badges'
+        || item.path === 'admin/utilisateurs' || item.path === 'admin/lots');
     }
     return this.nav;
   }

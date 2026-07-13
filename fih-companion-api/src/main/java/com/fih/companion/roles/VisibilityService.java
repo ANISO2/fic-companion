@@ -66,9 +66,16 @@ public class VisibilityService {
         this.classification = classification;
     }
 
-    /** Vrai si l'appelant est un administrateur : aucune restriction. */
+    /**
+     * Vrai si l'appelant n'est soumis à AUCUNE restriction de visibilité :
+     * administrateur OU compte « Gestion ». Un compte GESTION agit comme un
+     * administrateur sur les sections Invitations et Badges (il voit la totalité
+     * des types et des lots), sans pour autant gagner l'accès aux routes
+     * réservées à l'ADMIN (recette, statistiques, vérification) — ce contrôle
+     * reste dans {@link com.fih.companion.security.SecurityConfig}.
+     */
     public boolean isAdmin(Authentication auth) {
-        return Roles.isAdmin(auth);
+        return Roles.hasFullDataAccess(auth);
     }
 
     private String username(Authentication auth) {

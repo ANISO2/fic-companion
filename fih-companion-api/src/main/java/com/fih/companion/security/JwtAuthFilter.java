@@ -49,9 +49,14 @@ public class JwtAuthFilter extends OncePerRequestFilter {
                 String subject = claims.getSubject();
 
                 Object roleClaim = claims.get("role");
-                String authority = Roles.INVITATIONS_CLAIM.equals(roleClaim)
-                        ? "ROLE_" + Roles.INVITATIONS
-                        : "ROLE_" + Roles.ADMIN;
+                String authority;
+                if (Roles.INVITATIONS_CLAIM.equals(roleClaim)) {
+                    authority = "ROLE_" + Roles.INVITATIONS;
+                } else if (Roles.GESTION_CLAIM.equals(roleClaim)) {
+                    authority = "ROLE_" + Roles.GESTION;
+                } else {
+                    authority = "ROLE_" + Roles.ADMIN;
+                }
                 var auth = new UsernamePasswordAuthenticationToken(
                         subject, null,
                         List.of(new SimpleGrantedAuthority(authority)));

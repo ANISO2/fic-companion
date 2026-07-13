@@ -35,13 +35,13 @@ public class InvitationController {
         this.service = service;
     }
 
-     /**
-      * Feature 2 — the route stays reachable by ADMIN and INVITATIONS, but the
-      * audit fields (updatedBy / updatedAt) are only returned to ADMIN.
-      */
-     @GetMapping("/{numeroserie}/affectee")
+    /**
+     * Feature 2 — the route stays reachable by ADMIN and INVITATIONS, but the
+     * audit fields (updatedBy / updatedAt) are only returned to ADMIN.
+     */
+    @GetMapping("/{numeroserie}/affectee")
     public AffecteeDto get(@PathVariable String numeroserie, Authentication auth) {
-        return service.get(numeroserie, Roles.isAdmin(auth), auth)
+        return service.get(numeroserie, Roles.hasFullDataAccess(auth), auth)
                 .orElseThrow(() -> new ResponseStatusException(
                         HttpStatus.NOT_FOUND, "Aucun nom enregistré pour ce billet."));
     }
@@ -54,7 +54,7 @@ public class InvitationController {
         // The JWT subject is the specific account username (AdminInv1, AdminInv2,
         // or a real admin) — that is what lands in badge_affectation.updated_by.
         String updatedBy = auth == null ? null : auth.getName();
-        return service.set(numeroserie, request.name(), updatedBy, Roles.isAdmin(auth), auth);
+        return service.set(numeroserie, request.name(), updatedBy, Roles.hasFullDataAccess(auth), auth);
     }
 
 
@@ -67,7 +67,7 @@ public class InvitationController {
     @PostMapping("/affectation/lot")
     public LotResultDto assignLot(@Valid @RequestBody LotRequest request, Authentication auth) {
         String updatedBy = auth == null ? null : auth.getName();
-        return service.assignLot(request, updatedBy, Roles.isAdmin(auth), auth);
+        return service.assignLot(request, updatedBy, Roles.hasFullDataAccess(auth), auth);
     }
 
     /** CSV manifest (nom, numeroserie, codebarre, evenement) for an assigned range. */

@@ -314,7 +314,7 @@ const CONFIRM_SINGLE =
                 <th class="px-4 py-3">Titulaire</th>
                 <th class="px-4 py-3">Affectée à</th>
                 @if (showDelivery()) { <th class="px-4 py-3">Confié à</th> }
-                @if (auth.isAdmin()) { <th class="px-4 py-3">Affecté par</th> }
+                @if (auth.hasFullDataAccess()) { <th class="px-4 py-3">Affecté par</th> }
                 <th class="px-4 py-3">Statut</th>
                 @if (printable()) { <th class="px-4 py-3 text-right">Badge</th> }
               </tr>
@@ -366,7 +366,7 @@ const CONFIRM_SINGLE =
                       }
                     </td>
                   }
-                  @if (auth.isAdmin()) {
+                  @if (auth.hasFullDataAccess()) {
                     <td class="px-4 py-3">
                       @if (it.updatedBy) {
                         <div class="flex flex-col leading-tight">
@@ -470,7 +470,7 @@ export class BadgeDetailComponent implements OnInit {
   // « Confié à » — la colonne + le filtre « Non livrées » n'ont de sens que pour
   // un ADMIN et un VRAI type invitation (les seuls porteurs de lots). Un non-admin
   // ne voit que ses propres lignes : la propriété de livraison serait toujours lui.
-  showDelivery = computed(() => this.auth.isAdmin() && (this.header()?.invitation ?? false));
+  showDelivery = computed(() => this.auth.hasFullDataAccess() && (this.header()?.invitation ?? false));
 
   // Lot state (Change C)
   lotStart = '';

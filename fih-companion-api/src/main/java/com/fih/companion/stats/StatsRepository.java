@@ -141,11 +141,19 @@ public interface StatsRepository extends Repository<Tturnstile, Integer> {
 
     @Query(value = """
             SELECT e.reference AS "eventId", e.titre AS "eventTitle", e.ddate AS "eventDate",
-                   COALESCE(SUM(g.counterbillet  * g.prix), 0) AS "billet",
-                   COALESCE(SUM(g.countervoucher * g.prix), 0) AS "voucher",
-                   COALESCE(SUM((g.counterbillet + g.countervoucher) * g.prix), 0) AS "total"
+                   COALESCE(SUM(COALESCE(sb.vendu, 0)  * g.prix), 0) AS "billet",
+                   COALESCE(SUM(COALESCE(sv.vendu, 0) * g.prix), 0) AS "voucher",
+                   COALESCE(SUM((COALESCE(sb.vendu, 0) + COALESCE(sv.vendu, 0)) * g.prix), 0) AS "total"
             FROM evenement e
             JOIN generation g ON g.evenement = e.reference
+            LEFT JOIN (SELECT evenement, modelebillet, count(*) AS vendu
+                       FROM billet WHERE vendu IS TRUE
+                       GROUP BY evenement, modelebillet) sb
+                   ON sb.evenement = g.evenement AND sb.modelebillet = g.modelebillet
+            LEFT JOIN (SELECT evenement, modelebillet, count(*) AS vendu
+                       FROM voucher WHERE vendu IS TRUE
+                       GROUP BY evenement, modelebillet) sv
+                   ON sv.evenement = g.evenement AND sv.modelebillet = g.modelebillet
             WHERE g.prix > 0
             GROUP BY e.reference, e.titre, e.ddate
             ORDER BY "total" DESC, e.ddate
@@ -156,12 +164,20 @@ public interface StatsRepository extends Repository<Tturnstile, Integer> {
     @Query(value = """
             SELECT e.reference AS "eventId", e.titre AS "eventTitle", e.ddate AS "eventDate",
                    COALESCE(SUM(g.stockbillet + g.stockvoucher), 0)                          AS "totalGenere",
-                   COALESCE(SUM(g.counterbillet + g.countervoucher), 0)                        AS "totalVendu",
-                   COALESCE(SUM((g.stockbillet  - g.counterbillet)
-                              + (g.stockvoucher - g.countervoucher)), 0)                     AS "totalReste",
-                   COALESCE(SUM((g.counterbillet + g.countervoucher) * g.prix), 0)           AS "recetteTotale"
+                   COALESCE(SUM(COALESCE(sb.vendu, 0) + COALESCE(sv.vendu, 0)), 0)                        AS "totalVendu",
+                   COALESCE(SUM((g.stockbillet  - COALESCE(sb.vendu, 0))
+                              + (g.stockvoucher - COALESCE(sv.vendu, 0))), 0)                     AS "totalReste",
+                   COALESCE(SUM((COALESCE(sb.vendu, 0) + COALESCE(sv.vendu, 0)) * g.prix), 0)           AS "recetteTotale"
             FROM evenement e
             JOIN generation g ON g.evenement = e.reference
+            LEFT JOIN (SELECT evenement, modelebillet, count(*) AS vendu
+                       FROM billet WHERE vendu IS TRUE
+                       GROUP BY evenement, modelebillet) sb
+                   ON sb.evenement = g.evenement AND sb.modelebillet = g.modelebillet
+            LEFT JOIN (SELECT evenement, modelebillet, count(*) AS vendu
+                       FROM voucher WHERE vendu IS TRUE
+                       GROUP BY evenement, modelebillet) sv
+                   ON sv.evenement = g.evenement AND sv.modelebillet = g.modelebillet
             WHERE g.prix > 0
             GROUP BY e.reference, e.titre, e.ddate
             ORDER BY "recetteTotale" DESC, e.ddate
@@ -173,15 +189,23 @@ public interface StatsRepository extends Repository<Tturnstile, Integer> {
             SELECT m.reference AS "modelId", m.modele AS "modelName",
                    g.prix AS "montant",
                    g.stockbillet                                              AS "billetGeneration",
-                   g.counterbillet                                            AS "billetVente",
-                   (g.stockbillet - g.counterbillet)                          AS "billetReste",
+                   COALESCE(sb.vendu, 0)                                            AS "billetVente",
+                   (g.stockbillet - COALESCE(sb.vendu, 0))                          AS "billetReste",
                    g.stockvoucher                                             AS "voucherGeneration",
-                   g.countervoucher                                           AS "voucherVente",
-                   (g.stockvoucher - g.countervoucher)                        AS "voucherReste",
-                   (g.counterbillet + g.countervoucher)                       AS "totalVendu",
-                   (g.counterbillet + g.countervoucher) * g.prix              AS "recetteTnd"
+                   COALESCE(sv.vendu, 0)                                           AS "voucherVente",
+                   (g.stockvoucher - COALESCE(sv.vendu, 0))                        AS "voucherReste",
+                   (COALESCE(sb.vendu, 0) + COALESCE(sv.vendu, 0))                       AS "totalVendu",
+                   (COALESCE(sb.vendu, 0) + COALESCE(sv.vendu, 0)) * g.prix              AS "recetteTnd"
             FROM generation g
             JOIN modelebillet m ON m.reference = g.modelebillet
+            LEFT JOIN (SELECT evenement, modelebillet, count(*) AS vendu
+                       FROM billet WHERE vendu IS TRUE
+                       GROUP BY evenement, modelebillet) sb
+                   ON sb.evenement = g.evenement AND sb.modelebillet = g.modelebillet
+            LEFT JOIN (SELECT evenement, modelebillet, count(*) AS vendu
+                       FROM voucher WHERE vendu IS TRUE
+                       GROUP BY evenement, modelebillet) sv
+                   ON sv.evenement = g.evenement AND sv.modelebillet = g.modelebillet
             WHERE g.evenement = :eventId AND g.prix > 0
             ORDER BY m.modele
             """, nativeQuery = true)

@@ -24,7 +24,10 @@ import org.springframework.web.server.ResponseStatusException;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -148,7 +151,11 @@ public class AffecteeService {
                     a.proposedName, assigned, a.existingName));
         }
 
-        boolean baseUsed = affectationRepository.baseNameUsed(lot.baseName);
+        // Scopé au couple (événement, type) : le chip « Séquence poursuivie » ne
+        // s'affiche que si la numérotation reprend RÉELLEMENT une séquence existante
+        // pour l'un des couples de la plage — et non parce que le nom de base a
+        // servi ailleurs (autre événement / autre type), où l'on repart à -01.
+        boolean baseUsed = lot.sequenceContinued;
         boolean canAssign = !lot.eligible.isEmpty() && assignedCount == 0;
 
         return new LotPreviewDto(
@@ -252,15 +259,41 @@ public class AffecteeService {
         }
 
 
+        // Numérotation SCOPÉE au couple (événement, type d'invitation) — exactement
+        // comme l'affectation unitaire (voir setOnce). « Anis » repart à -01 dès
+        // qu'on change d'événement OU de type. Auparavant le lot s'appuyait sur un
+        // compteur GLOBAL (nextNumberForBase), d'où la poursuite indésirable de la
+        // séquence d'un type à l'autre et d'un événement à l'autre. Une plage peut
+        // chevaucher plusieurs couples : chacun est numéroté indépendamment, dans
+        // l'ordre des numéros de série.
         int total = eligibleRows.size();
-        int startNum = nextNumberForBase(baseName);
-        int lastNum = startNum + Math.max(total, 1) - 1;
-        int width = widthFor(lastNum);
 
-        List<Assignment> eligible = new ArrayList<>(total);
-        int i = startNum;
+        // 1er passage — nombre d'éligibles par couple (ordre de découverte préservé).
+        Map<PairKey, Integer> countByPair = new LinkedHashMap<>();
         for (LotRowProjection r : eligibleRows) {
-            String proposed = formatName(baseName, i++, width);
+            countByPair.merge(new PairKey(r.getEventId(), r.getModelId()), 1, Integer::sum);
+        }
+
+        // Point de départ + largeur du padding, calculés INDÉPENDAMMENT par couple.
+        Map<PairKey, Integer> nextByPair = new HashMap<>();
+        Map<PairKey, Integer> widthByPair = new HashMap<>();
+        boolean sequenceContinued = false;
+        for (Map.Entry<PairKey, Integer> e : countByPair.entrySet()) {
+            PairKey key = e.getKey();
+            int pairStart = nextNumberForBaseScoped(baseName, key.eventId(), key.modelId());
+            int pairLast = pairStart + Math.max(e.getValue(), 1) - 1;
+            nextByPair.put(key, pairStart);
+            widthByPair.put(key, widthFor(pairLast));
+            if (pairStart > 1) sequenceContinued = true;
+        }
+
+        // 2e passage — attribution des noms dans l'ordre des numéros de série.
+        List<Assignment> eligible = new ArrayList<>(total);
+        for (LotRowProjection r : eligibleRows) {
+            PairKey key = new PairKey(r.getEventId(), r.getModelId());
+            int number = nextByPair.get(key);
+            nextByPair.put(key, number + 1);
+            String proposed = formatName(baseName, number, widthByPair.get(key));
             eligible.add(new Assignment(r, proposed, r.getAffecteeA()));
         }
 
@@ -268,32 +301,17 @@ public class AffecteeService {
         lot.baseName = baseName;
         lot.eligible = eligible;
         lot.nonInvitationCount = nonInvitation;
+        lot.sequenceContinued = sequenceContinued;
         return lot;
     }
 
-
-    private int nextNumberForBase(String base) {
-        Pattern shape = Pattern.compile("^" + Pattern.quote(base) + "-(\\d+)$", Pattern.CASE_INSENSITIVE);
-        int max = 0;
-        for (String stored : affectationRepository.findNamesForBase(base)) {
-            if (stored == null) continue;
-            Matcher m = shape.matcher(stored.trim());
-            if (m.matches()) {
-                try {
-                    max = Math.max(max, Integer.parseInt(m.group(1)));
-                } catch (NumberFormatException ignore) {
-                }
-            }
-        }
-        return max + 1;
-    }
 
     /**
      * Prochain numéro pour {@code base}, mais UNIQUEMENT parmi les affectations du
      * même couple (événement, type d'invitation). Deux couples différents ont donc
      * chacun leur propre séquence : « Anis » recommence à 01 à chaque nouveau
-     * couple. Réservé à l'affectation « Affecté à » unitaire ; l'affectation par
-     * lot passe toujours par {@link #nextNumberForBase(String)} (global, inchangé).
+     * couple. Utilisé par l'affectation « Affecté à » unitaire ET par l'affectation
+     * par lot (via {@link #buildLot}), qui applique la même règle couple par couple.
      */
     private int nextNumberForBaseScoped(String base, Integer eventId, Integer modelId) {
         Pattern shape = Pattern.compile("^" + Pattern.quote(base) + "-(\\d+)$", Pattern.CASE_INSENSITIVE);
@@ -350,6 +368,11 @@ public class AffecteeService {
         String baseName;
         List<Assignment> eligible;
         int nonInvitationCount;
+        boolean sequenceContinued;
+    }
+
+    /** Clé de scoping de la numérotation : couple (événement, type d'invitation). */
+    private record PairKey(Integer eventId, Integer modelId) {
     }
 
     private static final class Assignment {

@@ -50,8 +50,9 @@ public class SecurityConfig {
                 + "-> DeviceTokenFilter -> JwtAuthFilter -> authorization rules. "
                 + "Public: OPTIONS/**, /api/auth/login, /api/events/**, /api/diagnostics/**. "
                 + "DEVICE or ADMIN: /api/verify/**, GET mobile stats. "
-                + "ADMIN or INVITATIONS: /api/badges/**, /api/invitations/** (Invitations & Badges section). "
-                + "ADMIN only: /api/admin/** (gestion des roles), /api/stats/** (overview, recette, verification, ...).");
+                + "ADMIN, INVITATIONS or GESTION: /api/badges/**, /api/invitations/**. "
+                + "ADMIN or GESTION: /api/admin/users/**, /api/admin/contingents/** (Utilisateurs & Lots). "
+                + "ADMIN only: reste de /api/admin/** (gestion des roles), /api/stats/** (overview, recette, verification, ...).");
         http
                 // Enable CORS using the bean below.
                 .cors(Customizer.withDefaults())
@@ -69,16 +70,20 @@ public class SecurityConfig {
                         // [ADDED] mobile dashboard: device OR admin may read these global feeds (GET only).
                         // Placed BEFORE the broad /api/stats/** rule so it is not shadowed.
                         .requestMatchers(HttpMethod.GET, MOBILE_STATS_GET).hasAnyRole("DEVICE", "ADMIN")
-                        // Feature 1 — the Invitations & Badges section: ADMIN or the restricted
-                        // INVITATIONS role. This is the ONLY area the restricted account may reach.
-                        .requestMatchers("/api/badges/**").hasAnyRole("ADMIN", "INVITATIONS")
-                        // The only write endpoints in the app (badge name): ADMIN or INVITATIONS.
-                        .requestMatchers("/api/invitations/**").hasAnyRole("ADMIN", "INVITATIONS")
-                        // Chantier 3 — « Gestion des rôles » : comptes, permissions par type,
-                        // lots (contingents) et audit. ADMIN uniquement, sans exception.
+                        // Feature 1 — the Invitations & Badges section: ADMIN, the restricted
+                        // INVITATIONS role, or the GESTION role.
+                        .requestMatchers("/api/badges/**").hasAnyRole("ADMIN", "INVITATIONS", "GESTION")
+                        // The only write endpoints in the app (badge name): ADMIN, INVITATIONS or GESTION.
+                        .requestMatchers("/api/invitations/**").hasAnyRole("ADMIN", "INVITATIONS", "GESTION")
+                        // « Gestion » — Utilisateurs et Lots d'invitations. Ces deux sous-chemins
+                        // sont ouverts au rôle GESTION ; ils DOIVENT précéder la règle large
+                        // /api/admin/** ci-dessous (Spring applique le premier matcher qui matche).
+                        .requestMatchers("/api/admin/users/**").hasAnyRole("ADMIN", "GESTION")
+                        .requestMatchers("/api/admin/contingents/**").hasAnyRole("ADMIN", "GESTION")
+                        // Chantier 3 — reste de « Gestion des rôles ». ADMIN uniquement.
                         .requestMatchers("/api/admin/**").hasRole("ADMIN")
                         // Everything else under stats (overview, recette/**, verification/**, ...):
-                        // ADMIN only — the INVITATIONS role is rejected here even if called directly.
+                        // ADMIN only — INVITATIONS et GESTION sont rejetés ici même en appel direct.
                         .requestMatchers("/api/stats/**").hasRole("ADMIN")
                         .anyRequest().authenticated())
                 .exceptionHandling(e -> e.authenticationEntryPoint(

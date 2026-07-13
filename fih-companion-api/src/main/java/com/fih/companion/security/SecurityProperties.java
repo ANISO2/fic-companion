@@ -24,6 +24,14 @@ public class SecurityProperties {
      */
     private List<InvitationsAccount> invitationsAccounts = new ArrayList<>();
 
+    /**
+     * « Gestion » — comptes en dur (fih.security.gestion-accounts) donnant accès
+     * aux sections Invitations, Badges, Utilisateurs et Lots d'invitations
+     * UNIQUEMENT. Même forme que {@link InvitationsAccount}. Le sujet du JWT reste
+     * le nom d'utilisateur réel, donc l'audit (updated_by) reste attribuable.
+     */
+    private List<InvitationsAccount> gestionAccounts = new ArrayList<>();
+
     public Jwt getJwt() {
         return jwt;
     }
@@ -54,6 +62,23 @@ public class SecurityProperties {
 
     public void setInvitationsAccounts(List<InvitationsAccount> invitationsAccounts) {
         this.invitationsAccounts = invitationsAccounts == null ? new ArrayList<>() : invitationsAccounts;
+    }
+
+    public List<InvitationsAccount> getGestionAccounts() {
+        return gestionAccounts;
+    }
+
+    public void setGestionAccounts(List<InvitationsAccount> gestionAccounts) {
+        this.gestionAccounts = gestionAccounts == null ? new ArrayList<>() : gestionAccounts;
+    }
+
+    /** Les comptes « Gestion » réellement exploitables (username + password renseignés). */
+    public List<InvitationsAccount> resolvedGestionAccounts() {
+        List<InvitationsAccount> out = new ArrayList<>();
+        for (InvitationsAccount a : gestionAccounts) {
+            if (a != null && a.isConfigured()) out.add(a);
+        }
+        return out;
     }
 
     /**
